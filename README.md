@@ -1,226 +1,141 @@
-# AdulTrace (LabelTruth India)
+# BetterBite
 
-**Checks packaged food for adulteration — and keeps the dual-standard comparison in its own view.**
+Check a packaged food before you buy it. BetterBite flags the ingredients worth avoiding, explains them in plain language, and suggests healthier brands in the same category with prices side by side.
 
-Built for the **SerpApi India Hackathon 2026** — Track 5: *Knowledge & Public
-Interest*.
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)
+![SerpApi](https://img.shields.io/badge/Powered%20by-SerpApi-4E7CE0)
 
-Point AdulTrace at a pack of food and it answers the direct question: what is
-in this, and what has been reported about it — additives matched from the
-label, the adulterants labs watch for in that product category, and news and
-regulatory coverage naming the brand or product. That is the **Adulteration &
-product report**, and it is the default view.
+Built for the **SerpApi India Hackathon 2026**, Knowledge & Public Interest track.
 
-A separate tab, **India vs. abroad**, holds the secondary question: how the
-same product's listings, prices and additive treatment differ between India and
-another market. Multinational brands do sell reformulated versions across
-markets — a different oil, preservative or colouring — and the comparison tab
-exists to show that gap without pretending it is the same thing as an
-adulteration finding.
+**Demo video:** [ADD YOUTUBE LINK]
+**Live app:** [ADD LINK, or delete this line if it's local only]
 
----
+![BetterBite screenshot](docs/screenshot-results.png)
 
-## How it uses SerpApi (3 engines)
+## Why I built this
 
-| Step | Engine | Feeds |
-|---|---|---|
-| 1 | `engine=google_lens` | Identity — names the product from the packaging photo (report tab) |
-| 2 | `engine=google_shopping` (×2: `gl=in` and `gl=uk/de/us`) | Listings and prices for the **India vs. abroad** tab |
-| 3 | `engine=google_news` + `engine=google` | Coverage and food-safety mentions naming the brand/product (report tab) |
+Most people can't read an ingredient list and tell what matters. Additive codes mean nothing in a shop aisle, and nobody knows if the "healthier" option on the next shelf costs 20 rupees more or 200. BetterBite answers both questions in a few seconds.
 
-All three calls are orchestrated server-side in `backend/services/analyzer.py`
-via `backend/services/serpapi_service.py`, which wraps every request in
-consistent `{ok, data, error}` handling so one failed engine never blanks
-the whole page — the UI just shows a warning banner and renders whatever
-did come back.
+## What it does
 
-## Architecture
+- Takes a photo of a pack, or a typed product or category like "Maggi" or "chips".
+- Lists the ingredients in that product that are worth avoiding, each with a one-line explanation. Technical detail is one tap away.
+- Suggests several healthier brands in the same category. Every card says why it's better (for example, millet flour instead of refined wheat) and shows its price next to the scanned product.
+
+Categories covered: instant noodles, potato chips, malt drinks, ketchup. [EDIT TO MATCH YOURS]
+
+## How SerpApi is used
+
+| Engine | Used for |
+|---|---|
+| Google Shopping (`google_shopping`, `gl=in`) | The scanned product's price, then one lookup per suggested alternative. The price comparison on each card comes from these results. |
+| Google Lens (`google_lens`) | Identifying a product from an uploaded photo. [DELETE THIS ROW IF PHOTO SCANNING ISN'T IN YOUR SUBMITTED VERSION] |
+
+Lookups are independent, so one failed request doesn't blank the whole result. If a price isn't found, the card says so.
+
+## Project structure
 
 ```
-cleanbite/
-├── backend/                     FastAPI service
-│   ├── main.py                  App entrypoint + REST endpoints
-│   ├── models.py                Pydantic request/response schemas
-│   ├── services/
-│   │   ├── serpapi_service.py   Lens / Shopping / News / Search query builders
-│   │   ├── additive_db.py       INS/E-number → risk tier reference table
-│   │   ├── analyzer.py          Orchestrates the full pipeline
-│   │   ├── price_utils.py       Listing prices → one same-currency comparison
-│   │   └── demo_cache.py        Fixtures for offline demos (off by default)
-│   ├── requirements.txt
-│   └── .env.example
-│
-└── frontend/                    Next.js 14 (App Router) + TypeScript + Tailwind
-    ├── app/
-    │   ├── layout.tsx           Fonts (Fraunces / Inter / IBM Plex Mono)
-    │   ├── page.tsx
-    │   └── globals.css
-    ├── components/
-    │   ├── Dashboard.tsx        State + the two result tabs
-    │   ├── Scanner.tsx          Photo upload / manual entry / demo picker
-    │   ├── AdditiveLedger.tsx   What is on the label, per additive (report)
-    │   ├── AdulterationHistoryCard.tsx  Unverified news & search mentions (report)
-    │   ├── NewsFeed.tsx         News matching the search (report)
-    │   ├── ComparisonView.tsx   India vs. overseas listings (comparison)
-    │   ├── ScoreGauge.tsx       "Inspection Gap Score" meter (comparison)
-    │   └── PriceInsight.tsx     Price difference card (comparison)
-    ├── lib/api.ts                Typed fetch client for the backend
-    └── package.json
+backend/
+  main.py                    FastAPI app and endpoints
+  models.py                  Pydantic schemas
+  services/
+    serpapi_service.py       SerpApi calls
+    additive_db.py           Ingredient reference table
+    alternatives_db.py       Alternative brands by category
+    analyzer.py              Ties the lookups together
+    demo_cache.py            Saved results for the preset buttons
+frontend/
+  app/                       Next.js pages
+  components/                UI components
+  lib/api.ts                 Typed client for the backend
 ```
 
-### REST API
+[CHECK THIS AGAINST YOUR REAL FOLDERS]
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/health` | Confirms the server is up, whether `SERPAPI_API_KEY` is configured, and whether demo fixtures are enabled |
-| `GET` | `/api/demo/presets` | Lists the cached demo products, or `{"presets": [], "enabled": false}` when switched off |
-| `GET` | `/api/demo/{key}` | Returns a cached full analysis (`bournvita`, `lays`, `maggi`, `ketchup`) — 409 unless `DEMO_PRESETS_ENABLED=true` |
-| `POST` | `/api/analyze` | JSON body — analyze by product name + pasted ingredients text |
-| `POST` | `/api/analyze/upload` | multipart/form-data — analyze from an uploaded packaging photo |
+## Getting started
 
-### Price comparison from the listings found
+You need Python 3.11+, Node 18+, and a free SerpApi key from https://serpapi.com/manage-api-key.
 
-Every analysis also converts the cheapest India listing and the
-cheapest overseas listing (from the same two Google Shopping calls above)
-into a common currency and states, in one plain sentence, whether that
-listing is cheaper or pricier in India — e.g. *"The cheapest listing found
-costs about 33% less in India than in UK."* This lives in
-`backend/services/price_utils.py` and renders in the frontend as the
-**"Price check from these listings"** card. The conversion rate is a small,
-clearly-labelled static table (not a live FX feed) so the demo never breaks
-on stage — see the note at the top of that file if you want to wire in
-SerpApi's `google_finance` engine for live rates instead.
-
-### Not showing false information about a brand
-
-The tool names real companies, so the pipeline is built to report only what
-it actually observed:
-
-- **No risk verdicts from keywords.** The old `adulteration_history` payload
-  graded each Google hit `Critical`/`Warning`, filed it under an enforcement
-  category and printed a red *"High Risk"* badge for the brand. It now returns
-  `mentions` — title, snippet, publisher, date, URL and which keywords matched,
-  each marked `verified: false`. `risk_level`, `severity` and `category` no
-  longer exist anywhere in the payload or the UI.
-- **No attribution to the wrong company.** A result is dropped unless it
-  actually names the brand or product queried. Brand is also no longer guessed
-  from a photo: an inferred brand led to pages about some other company being
-  rendered under this one, so `brand` is `null` unless the user typed it.
-- **A photo match is labelled a guess.** When a scan comes from an uploaded
-  pack, the UI states which product Google Lens visually matched and lists the
-  other candidates it saw, because the entire report below is about that match
-  and it can be wrong — with a pointer to "Type it in" to correct it.
-- **No invented metadata.** Missing dates and publishers stay `null` and render
-  as "Date not reported" / "Publisher not stated" instead of "Recent" and
-  "Google News", and there are no `#` placeholder links.
-- **No unscored product scored.** With no ingredient list to read,
-  `inspection_gap_score` is `null` and the gauge says "Not scored" — the old
-  code defaulted to `100`, a clean bill of health for a label it had never seen.
-- **Absence of coverage is never presented as innocence.** An empty mention
-  search says only that the search found nothing, and a failed search says the
-  search could not run — the green "no alerts detected" line is gone.
-- **Category watchlists are labelled as checklists.** `category_watchlist`
-  lists what labs commonly test for in a product *category*, with an explicit
-  note that nothing was analysed in a lab here.
-- **Provenance is on screen.** Live payloads carry
-  `provenance: "live_search_unverified"`; the demo presets are stamped
-  `synthetic_demo_fixture` at the API boundary, and the UI shows a banner
-  saying which is which. Market labels are derived from the country actually
-  queried instead of a hard-coded "Europe (EFSA)".
-
-### Plain-language mode
-
-Every flagged additive now carries two levels of explanation: a one-sentence
-`simple_explanation` in everyday language (shown by default), and the fuller
-regulatory detail (EFSA/FDA/Prop 65 references) tucked behind a "Show
-technical detail" toggle. Risk tiers are labelled **High risk / Caution /
-Low risk** instead of jargon. This keeps the tool readable for a general
-shopper while still giving judges and journalists the sourced detail on
-request.
-
----
-
-## Setup
-
-### 1. Backend
+### Backend
 
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
 cp .env.example .env
-# then edit .env and paste your key from https://serpapi.com/manage-api-key
-#   SERPAPI_API_KEY=your_key_here
+```
 
+Put your key in `.env`:
+
+```
+SERPAPI_API_KEY=your_key_here
+```
+
+Then start the server:
+
+```bash
 uvicorn main:app --reload --port 8000
 ```
 
-The API is now live at `http://localhost:8000`. Check `http://localhost:8000/api/health`.
-
-> **Note on live photo scanning:** SerpApi's Google Lens engine fetches the
-> image from a public URL rather than accepting raw bytes. The backend
-> serves uploads at `/uploads/<file>`, which works once the API is deployed
-> behind a public URL (Render, Railway, Fly.io, an ngrok tunnel, etc.). Set
-> `PUBLIC_BASE_URL` in `.env` to that public origin. Running purely on
-> `localhost`, use the **Quick Demo Presets** or the **"Type it in"** manual
-> mode instead — both work without a public URL.
-
-### 2. Frontend
+### Frontend
 
 ```bash
 cd frontend
 npm install
-
 cp .env.local.example .env.local
-# defaults to http://localhost:8000, change if your backend is deployed elsewhere
-
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open http://localhost:3000.
 
-### 3. Optional offline demo path (switched off by default)
+### No API key?
 
-`backend/services/demo_cache.py` holds four hand-written fixtures (Bournvita,
-Lay's, Maggi, Kissan Ketchup) with made-up prices, listing snippets and
-article claims about those real companies. Because the app must not present
-unverified information about a brand, they are **off by default**:
+The preset buttons (Maggi, Lay's, Bournvita, Kissan) load saved results, so you can see the full screen without any API calls. Typing a product or uploading a photo runs live searches and needs the key.
 
-- `GET /api/demo/presets` returns `{"presets": [], "enabled": false}`, so the
-  frontend renders no fixture buttons at all (it used to render a hard-coded
-  set even with no backend running).
-- `GET /api/demo/{key}` answers `409 demo_presets_disabled`.
-- `/api/health` reports `demo_presets_enabled` so you can see the current state.
+## API
 
-To bring the offline path back for a presentation with unreliable venue wifi,
-set `DEMO_PRESETS_ENABLED=true` in `backend/.env` and restart. Every fixture
-response is then stamped `provenance: "synthetic_demo_fixture"` and the UI
-paints an amber **"This is not live data"** band over the whole case file — say
-that out loud when you demo it, because the numbers were written for the
-interface, not fetched about those companies. The strictest option is to delete
-`demo_cache.py` and the two `/api/demo/*` routes entirely.
+| Method | Path | What it does |
+|---|---|---|
+| GET | `/api/health` | Confirms the server is up and whether a key is set |
+| GET | `/api/demo/presets` | Lists the saved demo products |
+| GET | `/api/demo/{key}` | Returns a saved result |
+| POST | `/api/analyze` | Analyzes a product by name |
+| POST | `/api/analyze/upload` | Analyzes an uploaded photo |
 
-Otherwise everything on screen comes from a live scan: upload a packaging photo
-(needs `PUBLIC_BASE_URL`, see the note above) or use **"Type it in"**.
+[CHECK THESE AGAINST YOUR REAL ROUTES]
 
----
+## Adding a category
 
-## Extending the additive database
+Open `backend/services/alternatives_db.py`, add a block with the match keywords and three or four alternative brands, and restart the backend.
 
-`backend/services/additive_db.py` holds the INS/E-number → risk-tier table
-and the alias list used to match free-text OCR/pasted ingredients. Add a new
-entry to `ADDITIVE_DB` and, if it has common alternate names, an entry to
-`_ALIASES` so `parse_ingredients_text()` picks it up automatically — no
-other code changes needed.
+## Limitations
 
-## Disclaimers
+- The ingredient notes and alternative brands come from small tables maintained by hand. They aren't a complete or official database and haven't all been fact-checked.
+- Prices are whatever Google Shopping returns at the time of the search. Pack sizes differ, so compare per 100 g yourself unless the card shows it. [EDIT IF YOU BUILT PER-100 G PRICING]
+- Photo scanning only works when the backend is reachable from the internet, because SerpApi fetches the image from a URL.
+- This isn't medical or regulatory advice. Check the pack and current FSSAI rules before relying on anything shown here.
 
-This is a hackathon prototype. The additive risk classifications and demo
-fixtures are illustrative starting points assembled from publicly reported
-FSSAI/EFSA/FDA actions — **not** a certified regulatory or medical database.
-Before publishing any specific claim about a named brand, verify it against
-the primary source (FSSAI standards, EFSA opinions, or the product's current
-label) — the whole point of the tool is to prompt that scrutiny, not to
-replace it.
+## Roadmap
+
+- More food categories
+- Price per 100 g on every card
+- Hindi labels
+- Shareable result image for WhatsApp
+
+[KEEP ONLY WHAT YOU REALLY PLAN TO DO]
+
+## AI tools
+
+Built with Claude (Anthropic), which generated the first version of the backend and frontend and helped draft the ingredient notes and interface text. I reviewed and tested the code. [ADD ANY OTHER TOOLS]
+
+## License
+
+[CHOOSE ONE, e.g. MIT, and add a LICENSE file. If you don't add one, others have no right to reuse the code.]
+
+## Acknowledgements
+
+Search data from [SerpApi](https://serpapi.com).
