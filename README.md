@@ -31,7 +31,7 @@ Categories covered: instant noodles, potato chips, malt drinks, ketchup. [EDIT T
 | Engine | Used for |
 |---|---|
 | Google Shopping (`google_shopping`, `gl=in`) | The scanned product's price, then one lookup per suggested alternative. The price comparison on each card comes from these results. |
-| Google Lens (`google_lens`) | Identifying a product from an uploaded photo. [DELETE THIS ROW IF PHOTO SCANNING ISN'T IN YOUR SUBMITTED VERSION] |
+| Google Lens (`google_lens`) | Identifying a product from an uploaded photo. |
 
 Lookups are independent, so one failed request doesn't blank the whole result. If a price isn't found, the card says so.
 
